@@ -1,0 +1,156 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+ <meta charset="UTF-8" />
+ <title>Racing Game</title>
+ <script>
+'use strict'
+window.onload = () => {
+
+///////////////////////////////////////////
+
+function Q(selector) {return document.querySelector(selector)}
+const g = Q('canvas').getContext('2d')
+const canvas_width = g.canvas.width
+const canvas_height = g.canvas.height
+
+///////////////////////////////////////////
+
+const vec = (x, y) => [x, y]
+const vmul = (c, v) => vec(c * v[0], c * v[1])
+const vplus = (v, w) => vec(v[0] + w[0], v[1] + w[1])
+const vminus = (v, w) => vplus(v, vmul(-1, w))
+const dot_product = (v, w) => v[0] * w[0] + v[1] * w[1]
+const cross_product = (v, w) => v[0] * w[1] - v[1] * w[0]
+const norm = v => dot_product(v, v)**0.5
+const vzero = vec(0, 0)
+
+///////////////////////////////////////////
+
+const epsilon = 1e-9
+function inside_diameter_circle(p, [r, s]) {
+  return dot_product(vminus(r, p), vminus(s, p)) <= epsilon
+}
+function which_side(p, seg) {
+  const [r, s] = seg
+  const c = cross_product(vminus(s, r), vminus(p, r))
+  return (Math.abs(c) <= epsilon && inside_diameter_circle(p, seg)) ?
+    true : Math.sign(c)
+}
+function divides([p, q], seg) {
+  const p_side = which_side(p, seg), q_side = which_side(q, seg)
+  return (p_side === true || q_side === true) ? true :
+    (p_side * q_side === -1) ? 'yes' : false
+}
+function intersects(seg1, seg2) {
+  const d1 = divides(seg1, seg2)
+  const d2 = divides(seg2, seg1)
+  return (d1 && d2) || (d1 === true) || (d2 === true)
+}
+
+///////////////////////////////////////////
+
+function clear() {const c = g.canvas; g.clearRect(0, 0, c.width, c.height)}
+function draw_line([[x1, y1], [x2, y2]]) {
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke()
+}
+function draw_circle([x, y], r, fill) {
+  g.beginPath(); g.arc(x, y, r, 0, 2 * Math.PI); fill ? g.fill() : g.stroke()
+}
+function draw_text([x, y], text) {
+  g.font = '30px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(text, x, y)
+}
+
+///////////////////////////////////////////
+
+const margin = 5
+const wall_list = [
+    [vec(0, margin), vec(canvas_width, margin)],
+    [vec(0, canvas_height - margin), vec(canvas_width, canvas_height - margin)],
+    [vec(margin, 0), vec(margin, canvas_height)],
+    [vec(canvas_width - margin, 0), vec(canvas_width - margin, canvas_height)],
+    [vec(200, 500), vec(200, 300)],
+    [vec(400, 300), vec(100, 0)],
+]
+
+const start_position = vec(100, 400)
+const goal = vec(200, 50)
+const goal_radius = 20
+const player_radius = 5
+const time_coord = vec(canvas_width / 2, 20)
+const dt = 0.2
+const update_millisec = 16
+
+///////////////////////////////////////////
+
+let position, velocity, acceleration, game_time, timer
+
+function initialize() {
+  position = start_position
+  velocity = acceleration = vzero
+  game_time = -1
+  update()
+}
+
+///////////////////////////////////////////
+
+const acc_by_key = {
+  ArrowUp: vec(0, -1),
+  ArrowDown: vec(0, 1),
+  ArrowLeft: vec(-1, 0),
+  ArrowRight: vec(1, 0),
+}
+document.onkeydown = e => {acceleration = acc_by_key[e.key] || acceleration}
+document.onkeyup = e => acc_by_key[e.key] && (acceleration = vzero)
+
+function update() {
+  //
+  const old_position = position
+  game_time += 1
+  velocity = vplus(velocity, vmul(dt, acceleration))
+  position = vplus(position, vmul(dt, velocity))
+  //
+  clear()
+  g.strokeStyle = 'green'
+  wall_list.forEach(wall_segment => draw_line(wall_segment))
+  g.strokeStyle = 'white'
+  draw_circle(goal, goal_radius)
+  g.fillStyle = 'orange'
+  draw_text(time_coord, game_time)
+  g.fillStyle = 'yellow'
+  draw_circle(position, player_radius, true)
+  //
+  const player_segment = [old_position, position]
+  g.strokeStyle = 'red'
+  const crash = wall_list.some(wall_segment =>
+    intersects(player_segment, wall_segment) && (draw_line(wall_segment), true))
+  const finish = norm(vminus(position, goal)) <= goal_radius
+  if (crash || finish) {stop()}
+}
+
+///////////////////////////////////////////
+
+const start_button = Q('#start')
+
+function start() {
+  initialize()
+  timer = setInterval(update, update_millisec)
+  start_button.disabled = true
+}
+function stop() {clearInterval(timer); start_button.disabled = false}
+start_button.onclick = start
+initialize()
+
+///////////////////////////////////////////
+
+}
+ </script>
+</head>
+
+<body>
+<h1><a href="https://github.com/kaorahi/racing_game">Racing Game</a></h1>
+<canvas width="500" height="500" style="background: black;"></canvas>
+<p>Move the dot to the goal circle using the arrow keys.</p>
+<button id="start">Start</button>
+</body>
